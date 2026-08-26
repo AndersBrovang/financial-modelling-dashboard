@@ -1,6 +1,5 @@
-# Finance Learning Lab
-
-A hands-on project for learning financial modelling by building interactive Streamlit dashboards instead of static spreadsheets.
+# Financial Modelling Dashboard For Learning
+A hands-on project for learning financial modelling by building interactive Streamlit dashboards.
 
 ## Goal
 
