@@ -81,18 +81,6 @@ else:
             st.error(f"Missing required columns. Need: {', '.join(required_cols)}")
         else:
             summary_rows = []
-            for i, row in loans_df.iterrows():
-                loan_schedule, loan_payment = build_schedule(row["loan_amount"], row["annual_rate"], row["years"])
-                summary_rows.append({
-                "Loan": f"Loan {i + 1} (${row['loan_amount']:,.0f})",
-                    "Monthly payment": loan_payment,
-                    "Total interest": loan_schedule["Interest"].sum(),
-                    "Payoff (years)": len(loan_schedule) / 12,
-                })
-
-            summary_df = pd.DataFrame(summary_rows)
-            st.dataframe(summary_df)
-            summary_rows = []
             balances = {}
             for i, row in loans_df.iterrows():
                 loan_schedule, loan_payment = build_schedule(row["loan_amount"], row["annual_rate"], row["years"])
