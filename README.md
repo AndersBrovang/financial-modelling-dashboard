@@ -7,8 +7,8 @@ Mix programming with financial modelling: input assumptions (or upload a CSV/Exc
 
 ## Models
 
-- [ ] **Loan / investment amortization calculator** — time value of money, cash flow schedules *(in progress)*
-- [ ] DCF valuation model
+- [x] **Loan / investment amortization calculator** — time value of money, cash flow schedules
+- [ ] DCF valuation model *(in progress)*
 - [ ] Simple 3-statement model
 
 ## Getting started
