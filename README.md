@@ -1,4 +1,4 @@
-# Financial Modelling Dashboard For Learning
+# Financial Modelling Dashboard
 A hands-on project for learning financial modelling by building interactive Streamlit dashboards.
 
 ## Goal
