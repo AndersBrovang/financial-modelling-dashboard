@@ -1,0 +1,4 @@
+starting_cf,growth_rate,discount_rate,years,include_terminal_value
+100000,5,10,5,True
+50000,8,12,10,True
+250000,3,9,7,False
