@@ -8,7 +8,7 @@ Mix programming with financial modelling: input assumptions (or upload a CSV/Exc
 ## Models
 
 - [x] **Loan / investment amortization calculator** — time value of money, cash flow schedules
-- [ ] DCF valuation model *(in progress)*
+- [x] **DCF valuation model** — projected cash flows, present value, terminal value
 - [ ] Simple 3-statement model
 
 ## Getting started
@@ -23,4 +23,6 @@ streamlit run app.py
 ```
 app.py              # Streamlit entry point
 requirements.txt    # Python dependencies
+sample_loans.csv    # Example upload for the amortization calculator
+sample_dcf.csv      # Example upload for the DCF valuation model
 ```

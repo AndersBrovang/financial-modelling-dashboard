@@ -1,0 +1,4 @@
+starting_cash_flow,growth_rate,discount_rate,years,terminal_growth_rate
+1000000,8,10,5,2.5
+500000,5,9,7,2
+2000000,12,11,10,3
