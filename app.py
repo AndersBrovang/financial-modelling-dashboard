@@ -7,7 +7,7 @@ import pandas as pd
 st.set_page_config(page_title="Financial Modelling Dashboard", layout="wide")
 st.title("Financial Modelling Dashboard")
 
-tab_amortization, tab_dcf = st.tabs(["Loan & Investment Amortization", "DCF Valuation"])
+tab_amortization, tab_dcf, tab_three_statement = st.tabs(["Loan & Investment Amortization", "DCF Valuation", "3-Statement Model"])
 
 
 def build_schedule(loan_amount, annual_rate, years):
@@ -57,6 +57,66 @@ def build_dcf(starting_cf, growth_rate, discount_rate, years, include_terminal_v
 
     total_valuation = pv_of_projection + pv_of_terminal
     return schedule_df, total_valuation, pv_of_terminal
+
+def build_three_statement(
+    starting_revenue, growth_rate, gross_margin, opex_pct, da_pct, tax_rate,
+    years, starting_debt, interest_rate, annual_debt_repayment, capex_pct,
+    starting_cash, starting_ppe, starting_equity,
+):
+    g = growth_rate / 100
+    gm = gross_margin / 100
+    opex_p = opex_pct / 100
+    da_p = da_pct / 100
+    tax = tax_rate / 100
+    r = interest_rate / 100
+    
+    rows = []
+    revenue = starting_revenue
+    debt = starting_debt
+    cash = starting_cash
+    ppe = starting_ppe
+    equity = starting_equity
+    capex_p = capex_pct / 100
+    
+    for year in range(1, years + 1):
+    # --- Income statement ---
+        revenue = revenue * (1 + g)
+        cogs = revenue * (1 - gm)
+        gross_profit = revenue - cogs
+        opex = revenue * opex_p
+        ebitda = gross_profit - opex
+        da = revenue * da_p
+        ebit = ebitda - da
+        interest_expense = debt * r
+        ebt = ebit - interest_expense
+        tax_expense = ebt * tax if ebt > 0 else 0
+        net_income = ebt - tax_expense
+        
+        # --- Debt roll-forward (after interest_expense is already computed) ---
+        repayment = min(annual_debt_repayment, debt)   # can't repay more than what's left
+        debt = debt - repayment
+
+        # --- Cash flow statement ---
+        capex = revenue * capex_p
+        change_in_cash = net_income + da - capex - repayment
+        cash = cash + change_in_cash
+        
+        # --- Balance sheet roll-forward ---
+        ppe = ppe + capex - da
+        equity = equity + net_income
+
+        # --- Balance check ---
+        assets = cash + ppe
+        liab_and_equity = debt + equity
+        balances = abs(assets - liab_and_equity) < 0.01
+
+        rows.append({
+            "Year": year, "Revenue": revenue, "Net Income": net_income,
+            "Cash": cash, "PP&E": ppe, "Debt": debt, "Equity": equity,
+            "Assets": assets, "Liabilities + Equity": liab_and_equity, "Balances?": balances,
+        })
+
+    return pd.DataFrame(rows)
 
 
 with tab_amortization:
@@ -214,3 +274,113 @@ with tab_dcf:
                 st.subheader("Projected cash flows over time (all scenarios)")
                 cash_flow_compare_df = pd.DataFrame(cash_flows)
                 st.line_chart(cash_flow_compare_df)
+                
+with tab_three_statement:
+    ts_mode = st.radio("Input mode", ["Manual entry", "Upload CSV/Excel"], horizontal=True, key="ts_mode")
+
+    if ts_mode == "Manual entry":
+        st.subheader("Income statement assumptions")
+        col1, col2, col3 = st.columns(3)
+        starting_revenue = col1.number_input("Starting revenue ($)", min_value=0.0, value=1000000.0)
+        growth_rate = col2.number_input("Revenue growth rate (%)", value=10.0)
+        years = col3.number_input("Years to project", min_value=1, value=5, key="ts_years")
+
+        col1, col2, col3 = st.columns(3)
+        gross_margin = col1.number_input("Gross margin (%)", min_value=0.0, max_value=100.0, value=40.0)
+        opex_pct = col2.number_input("Opex (% of revenue)", min_value=0.0, value=15.0)
+        da_pct = col3.number_input("D&A (% of revenue)", min_value=0.0, value=5.0)
+
+        col1, col2 = st.columns(2)
+        tax_rate = col1.number_input("Tax rate (%)", min_value=0.0, max_value=100.0, value=21.0)
+        capex_pct = col2.number_input("Capex (% of revenue)", min_value=0.0, value=6.0)
+
+        st.subheader("Debt assumptions")
+        col1, col2, col3 = st.columns(3)
+        starting_debt = col1.number_input("Starting debt ($)", min_value=0.0, value=500000.0)
+        interest_rate = col2.number_input("Interest rate (%)", min_value=0.0, value=6.0)
+        annual_debt_repayment = col3.number_input("Annual debt repayment ($)", min_value=0.0, value=50000.0)
+
+        st.subheader("Starting balance sheet")
+        col1, col2, col3 = st.columns(3)
+        starting_cash = col1.number_input("Starting cash ($)", min_value=0.0, value=200000.0)
+        starting_ppe = col2.number_input("Starting PP&E ($)", min_value=0.0, value=800000.0)
+        starting_equity = col3.number_input("Starting equity ($)", min_value=0.0, value=500000.0)
+
+        statements_df = build_three_statement(
+            starting_revenue, growth_rate, gross_margin, opex_pct, da_pct, tax_rate,
+            years, starting_debt, interest_rate, annual_debt_repayment, capex_pct,
+            starting_cash, starting_ppe, starting_equity,
+        )
+
+        st.dataframe(statements_df)
+
+        if not statements_df["Balances?"].all():
+            st.error("Balance sheet doesn't balance in at least one year — check your assumptions.")
+
+        ending_cash = statements_df["Cash"].iloc[-1]
+        ending_equity = statements_df["Equity"].iloc[-1]
+        total_net_income = statements_df["Net Income"].sum()
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Ending cash", f"${ending_cash:,.2f}")
+        col2.metric("Ending equity", f"${ending_equity:,.2f}")
+        col3.metric("Total net income", f"${total_net_income:,.2f}")
+
+        # Graphs
+        st.subheader("Revenue & net income over time")
+        st.line_chart(statements_df.set_index("Year")[["Revenue", "Net Income"]])
+
+        st.subheader("Balance sheet composition over time")
+        st.bar_chart(statements_df.set_index("Year")[["Cash", "PP&E", "Debt", "Equity"]])
+
+        # CSV Download
+        csv_data = statements_df.to_csv(index=False).encode("utf-8")
+        st.download_button("Download statements as CSV", csv_data, "three_statement_model.csv", "text/csv", key="ts_download")
+
+    else:
+        uploaded_file = st.file_uploader("Upload file", type=["csv", "xlsx"], key="ts_upload")
+
+        if uploaded_file is not None:
+            if uploaded_file.name.endswith(".csv"):
+                scenarios_df = pd.read_csv(uploaded_file)
+            else:
+                scenarios_df = pd.read_excel(uploaded_file)
+
+            st.dataframe(scenarios_df)
+
+            required_cols = {
+                "starting_revenue", "growth_rate", "gross_margin", "opex_pct", "da_pct", "tax_rate",
+                "years", "starting_debt", "interest_rate", "annual_debt_repayment", "capex_pct",
+                "starting_cash", "starting_ppe", "starting_equity",
+            }
+            if scenarios_df.empty:
+                st.error("Uploaded file has no rows.")
+            elif not required_cols.issubset(scenarios_df.columns):
+                st.error(f"Missing required columns. Need: {', '.join(sorted(required_cols))}")
+            else:
+                summary_rows = []
+                cash_series = {}
+                for i, row in scenarios_df.iterrows():
+                    scenario_df = build_three_statement(
+                        row["starting_revenue"], row["growth_rate"], row["gross_margin"], row["opex_pct"],
+                        row["da_pct"], row["tax_rate"], int(row["years"]), row["starting_debt"],
+                        row["interest_rate"], row["annual_debt_repayment"], row["capex_pct"],
+                        row["starting_cash"], row["starting_ppe"], row["starting_equity"],
+                    )
+                    label = f"Scenario {i + 1} (${row['starting_revenue']:,.0f})"
+
+                    summary_rows.append({
+                        "Scenario": label,
+                        "Ending cash": scenario_df["Cash"].iloc[-1],
+                        "Ending equity": scenario_df["Equity"].iloc[-1],
+                        "Balances every year?": bool(scenario_df["Balances?"].all()),
+                    })
+
+                    cash_series[label] = scenario_df.set_index("Year")["Cash"]
+
+                summary_df = pd.DataFrame(summary_rows)
+                st.dataframe(summary_df)
+
+                st.subheader("Cash over time (all scenarios)")
+                cash_compare_df = pd.DataFrame(cash_series)
+                st.line_chart(cash_compare_df)
